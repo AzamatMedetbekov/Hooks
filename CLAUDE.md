@@ -65,3 +65,24 @@ export function getCustomerByEmail(db: Database, email: string): Promise<any> {
 ## Critical Guidance
 
 - Critical: All database queries must be written in the ./src/queries dir
+
+## Hook System Learnings
+
+### Exit Codes
+- exit(0) = Allow the tool to proceed
+- exit(2) = Block the tool with error message
+- stdout messages shown to Claude on block
+
+### Hook Input (stdin)
+- JSON with tool_input containing tool parameters
+- tool_input.file_path for Read tool
+- tool_input.content for Write tool
+
+### Settings.json Structure
+- PreToolUse: runs BEFORE tool execution
+- PostToolUse: runs AFTER tool execution
+- matcher: regex pattern for tool names
+
+### Debugging Tips
+- Use: jq . > debug.json to inspect stdin
+- Check: node hooks/my_hook.js < test.json
