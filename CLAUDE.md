@@ -66,23 +66,47 @@ export function getCustomerByEmail(db: Database, email: string): Promise<any> {
 
 - Critical: All database queries must be written in the ./src/queries dir
 
-## Hook System Learnings
+## Hook System Configuration
 
-### Exit Codes
-- exit(0) = Allow the tool to proceed
-- exit(2) = Block the tool with error message
-- stdout messages shown to Claude on block
+This repository uses Claude Code hooks to enforce quality, security, and logging. 
 
-### Hook Input (stdin)
-- JSON with tool_input containing tool parameters
-- tool_input.file_path for Read tool
-- tool_input.content for Write tool
+### Active Hooks
 
-### Settings.json Structure
-- PreToolUse: runs BEFORE tool execution
-- PostToolUse: runs AFTER tool execution
-- matcher: regex pattern for tool names
+| Hook | Type | Trigger | Purpose |
+|------|------|---------|---------|
+| `hooks/query_hook.js` | **Pre** | Write/Edit | **Duplicate Prevention**: Analyzes new queries in `src/queries` using Claude SDK. Blocks duplication with exit code 2. |
+| `hooks/tsc.js` | **Post** | Write/Edit | **Type Checking**: Runs `tsc` after changes. Fails the tool if compilation errors occur. |
+| `hooks/log_hook.js` | **Post** | Write/Edit | **Audit Logging**: Appends timestamped entries to `changes.log` for every modification. |
+| `prettier` (cmd) | **Post** | Write/Edit | **Formatting**: Auto-formats modified files using Prettier. |
+| `jq` (logging) | **Pre/Post**| * (All) | **Debug Logging**: Dumps raw tool input/output to `pre-log.json` and `post-log.json`. |
 
-### Debugging Tips
-- Use: jq . > debug.json to inspect stdin
-- Check: node hooks/my_hook.js < test.json
+### Hook Development Standards
+
+When modifying hooks in `hooks/`:
+
+1.  **Input Handling**:
+    -   Read full JSON from `stdin` (buffered).
+    -   Parse `tool_input` carefully (check `filePath`, `file_path`, `path`).
+
+2.  **Exit Codes**:
+    -   `exit(0)`: **Allow** / Success.
+    -   `exit(1)`: **Error** (Hook failed to run).
+    -   `exit(2)`: **Block** (Policy violation, e.g., "Cannot read .env").
+
+3.  **Output**:
+    -   `stdout` is ignored unless blocking.
+    -   `stderr` is shown to the user on block/failure.
+
+### Example: Blocking Hook
+
+```javascript
+// hooks/block_env.js
+async function main() {
+  // ... read input ...
+  if (input.file_path.includes('.env')) {
+    console.error("Blocked: Access to .env is forbidden");
+    process.exit(2); // BLOCK
+  }
+  process.exit(0); // ALLOW
+}
+```
